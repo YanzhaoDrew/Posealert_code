@@ -1,22 +1,174 @@
 import cv2
-import os
 import mediapipe as mp
 import numpy as np
 import pandas as pd
-import time
-import datetime
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import math
-from mpl_toolkits import mplot3d
-# from celluloid import Camera
 from scipy import spatial
-import pyshine as ps
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-# 定义计算角度的函数
+class posecompare:
+    def __init__(self, targetpath):
+
+        # Main function starts here
+        cap = cv2.VideoCapture(0)
+
+        x = extractKeypoint(targetpath)
+        angle_target = x[2]
+        point_target = x[1]
+        image_target = x[3]
+
+        # target window screen height and width
+        dim = (960, 760)
+        resized = cv2.resize(image_target, dim, interpolation=cv2.INTER_AREA)
+        cv2.imshow('target', resized)
+
+        # start the real-time pose detection and compare to the target
+        with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+            while cap.isOpened():
+                success, frame = cap.read()
+
+                if not success:
+                    print("Something error with your camera.")
+                    # If loading a video, use 'break' instead of 'continue'.
+                    # but right now we compare to images, maybe later can support video
+                    continue
+
+                # read frame image from real-time camera
+                image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # set flag non-writeable and record the result arrays
+                image.flags.writeable = False
+                results = pose.process(image)
+
+                # if we want to draw landmarks we need to make it writeable
+                image.flags.writeable = True
+                image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+                # shape is a tuple of three values (height, width, channels) ,_ is hold for the channel,
+                image_height, image_width, _ = image.shape
+                image = cv2.resize(image, (int(image_width * (860 / image_height)), 860))
+
+                try:
+
+                    # get the result landmark and angle_point
+                    landmarks = results.pose_landmarks.landmark
+                    angle_point = []
+
+                    shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
+                                landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y,
+                                landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].z,
+                                round(landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].visibility * 100, 2)]
+                    elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
+                             landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y,
+                             landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].z,
+                             round(landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].visibility * 100, 2)]
+                    wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,
+                             landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y,
+                             landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].z,
+                             round(landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].visibility * 100, 2)]
+
+                    right_elbow = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,
+                                   landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y]
+                    angle_point.append(right_elbow)
+
+                    left_elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
+                                  landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
+                    angle_point.append(left_elbow)
+
+                    right_shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
+                                      landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
+                    angle_point.append(right_shoulder)
+
+                    left_shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
+                                     landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
+                    angle_point.append(left_shoulder)
+
+                    right_wrist = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x,
+                                   landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
+
+                    left_wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,
+                                  landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
+
+                    right_hip = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
+                                 landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
+                    angle_point.append(right_hip)
+
+                    left_hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x,
+                                landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
+                    angle_point.append(left_hip)
+
+                    right_knee = [landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].x,
+                                  landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].y]
+                    angle_point.append(right_knee)
+
+                    left_knee = [landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].x,
+                                 landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].y]
+                    angle_point.append(left_knee)
+                    right_ankle = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
+                                   landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y]
+
+                    left_ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x,
+                                  landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
+
+                    keypoints = []
+                    for point in landmarks:
+                        keypoints.append({
+                            'X': point.x,
+                            'Y': point.y,
+                            'Z': point.z,
+                        })
+
+                    # compare key points with target points
+                    p_score = dif_compare(keypoints, point_target)
+
+                    angle = []
+
+                    angle1 = calculateAngle(right_shoulder, right_elbow, right_wrist)
+                    angle.append(int(angle1))
+                    angle2 = calculateAngle(left_shoulder, left_elbow, left_wrist)
+                    angle.append(int(angle2))
+                    angle3 = calculateAngle(right_elbow, right_shoulder, right_hip)
+                    angle.append(int(angle3))
+                    angle4 = calculateAngle(left_elbow, left_shoulder, left_hip)
+                    angle.append(int(angle4))
+                    angle5 = calculateAngle(right_shoulder, right_hip, right_knee)
+                    angle.append(int(angle5))
+                    angle6 = calculateAngle(left_shoulder, left_hip, left_knee)
+                    angle.append(int(angle6))
+                    angle7 = calculateAngle(right_hip, right_knee, right_ankle)
+                    angle.append(int(angle7))
+                    angle8 = calculateAngle(left_hip, left_knee, left_ankle)
+                    angle.append(int(angle8))
+
+                    compare_pose(image, angle_point, angle, angle_target)
+
+                    a_score = diff_compare_angle(angle, angle_target)
+
+                    if (p_score >= a_score):
+                        cv2.putText(image, str(int((1 - a_score) * 100)), (80, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                    [0, 0, 255], 2,
+                                    cv2.LINE_AA)
+                    else:
+                        cv2.putText(image, str(int((1 - p_score) * 100)), (80, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                    [0, 0, 255], 2,
+                                    cv2.LINE_AA)
+
+                except:
+                    pass
+
+                mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                                          mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=4, circle_radius=4),
+                                          mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=3, circle_radius=3)
+                                          )
+
+                cv2.imshow('AI Exercise', image)
+
+                if cv2.waitKey(10) & 0xFF == ord('q'):
+                    cap.release()
+                    cv2.destroyAllWindows()
+                    break
+
 def calculateAngle(a, b, c):
     a = np.array(a)
     b = np.array(b)
@@ -33,37 +185,24 @@ def calculateAngle(a, b, c):
 # cap = cv2.VideoCapture(0)
 # 2D
 def extractKeypoint(path):
-    IMAGE_FILES = [path]  # 文件图像
-
-    stage = None  # 即不会为整个Pipeline运行分配全局代理，并且每个stage部分将需要包含其自己的agent部分
+    IMAGE_FILES = [path]
     joint_list_video = pd.DataFrame([])
-    """
-    DataFrame有行和列的索引；它可以被看作是一个Series的字典（Series们共享一个索引）
-        state	year	pop
-    0	Ohio	2000.0	1.5
-    1	Ohio	2001.0	1.7
-    2	Ohio	2002.0	3.6
-    3	Nevada	2001.0	2.4
-    4	Nevada	NaN	2.9
-    """
     count = 0
 
-    with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:  # 默认0.5， 0.5
-        # 检测置信度大于0.5代表检测到了，若此时跟踪置信度大于0.5就继续跟踪，小于就沿用上一次，避免一次又一次重复使用模型
+    with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         for idx, file in enumerate(IMAGE_FILES):
             image = cv2.imread(file)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # BGR转RGB通道用于pose加工
-            image.flags.writeable = False  # 加工前，flag为False
-            results = pose.process(image)  # 对图片进行pose_Detect
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image.flags.writeable = False
+            results = pose.process(image)
 
-            image.flags.writeable = True  # 加工后，flag为True
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)  # RGB转RGB通道用于尺寸检测
+            image.flags.writeable = True
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
             image_h, image_w, _ = image.shape
-            # 尺寸录入
+
             try:
 
-                landmarks = results.pose_landmarks.landmark  # 获取所有关键点信息
-
+                landmarks = results.pose_landmarks.landmark
 
                 left_shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
                                  landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
@@ -101,11 +240,10 @@ def extractKeypoint(path):
                 right_ankle = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
                                landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y]
 
-                joints = []
                 joint_list = pd.DataFrame([])
-                # zip意思是并行遍历，就是i作为index，每次遍历将每个joint点可视化出来， i = 32退出循环
+
                 for i, data_point in zip(range(len(landmarks)), landmarks):
-                    joints = pd.DataFrame({  # 记录到pandas的字典集中
+                    joints = pd.DataFrame({
                         'frame': count,
                         'id': i,
                         'x': data_point.x,
@@ -113,9 +251,9 @@ def extractKeypoint(path):
                         'z': data_point.z,
                         'vis': data_point.visibility
                     }, index=[0])
-                    joint_list = joint_list.append(joints, ignore_index=True)
-                    # 将读取字典集加入到新的joint_list字典集中
-                    # 将landmarks各个可视的点读入关键点中,33个关键点
+                    joint_list = pd.concat([joint_list, joints], ignore_index=True)
+
+
                 keypoints = []
                 for point in landmarks:
                     keypoints.append({
@@ -125,41 +263,23 @@ def extractKeypoint(path):
                     })
 
                 angle = []
-                angle_list = pd.DataFrame([])
-                # 角度字典集
-                # 对于右肘，右肩膀，右腕的角度计算,后加入到angle列表中
                 angle1 = calculateAngle(right_shoulder, right_elbow, right_wrist)
                 angle.append(int(angle1))
-                # 对于左肘，左肩膀，左腕的角度计算,后加入到angle列表中
                 angle2 = calculateAngle(left_shoulder, left_elbow, left_wrist)
                 angle.append(int(angle2))
-                # 对于右肘，右肩膀，右臀部，髋部的角度计算,后加入到angle列表中
                 angle3 = calculateAngle(right_elbow, right_shoulder, right_hip)
                 angle.append(int(angle3))
-                # 对于左肘，左肩膀，左臀部，髋部的角度计算,后加入到angle列表中
                 angle4 = calculateAngle(left_elbow, left_shoulder, left_hip)
                 angle.append(int(angle4))
-                # 对于右肩膀，右髋部，臀部，右膝盖的角度计算,后加入到angle列表中
                 angle5 = calculateAngle(right_shoulder, right_hip, right_knee)
                 angle.append(int(angle5))
-                # 对于左肩膀，左臀部，左膝盖的角度计算,后加入到angle列表中
                 angle6 = calculateAngle(left_shoulder, left_hip, left_knee)
                 angle.append(int(angle6))
-                # 对于右臀部，右膝盖，右脚腕的角度计算, 后加入到angle列表中
                 angle7 = calculateAngle(right_hip, right_knee, right_ankle)
                 angle.append(int(angle7))
-                # 对于左臀部，左膝盖，左脚腕的角度计算, 后加入到angle列表中
                 angle8 = calculateAngle(left_hip, left_knee, left_ankle)
                 angle.append(int(angle8))
-                # 分别对于左右手腕，肩膀，臀部，膝盖进行说明
-                # cv.putText()参数说明
-                # 图片
-                # 要添加的文字
-                # 文字添加到图片上的位置
-                # 字体的类型
-                # 字体大小
-                # 字体颜色
-                # 字体粗细
+
                 cv2.putText(image,
                             str(1),
                             tuple(np.multiply(right_elbow, [image_w, image_h, ]).astype(int)),
@@ -233,18 +353,41 @@ def extractKeypoint(path):
                             cv2.LINE_AA
                             )
 
-
-
-            #             if angle >120:
-            #                 stage = "down"
-            #             if angle <30 and stage == 'down':
-            #                 stage = "up"
-            #                 counter +=1
-
-            # 定义 try 块引发错误时要运行的代码块
             except:
-                pass 
+                pass
 
+            joint_list_video = pd.concat([joint_list_video, joint_list], ignore_index=True)
+
+            cv2.rectangle(image, (0, 0), (100, 255), (255, 255, 255), -1)
+
+            cv2.putText(image, 'ID', (10, 14), cv2.FONT_HERSHEY_SIMPLEX, 0.6, [0, 0, 255], 2, cv2.LINE_AA)
+            cv2.putText(image, str(1), (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(2), (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(3), (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(4), (10, 130), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(5), (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(6), (10, 190), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(7), (10, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(8), (10, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+
+            cv2.putText(image, 'Angle', (40, 12), cv2.FONT_HERSHEY_SIMPLEX, 0.6, [0, 0, 255], 2, cv2.LINE_AA)
+            cv2.putText(image, str(int(angle1)), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(int(angle2)), (40, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(int(angle3)), (40, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(int(angle4)), (40, 130), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(int(angle5)), (40, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(int(angle6)), (40, 190), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(int(angle7)), (40, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+            cv2.putText(image, str(int(angle8)), (40, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+
+            # Render detections
+            mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                                      mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=4, circle_radius=2),
+                                      mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=4, circle_radius=2)
+
+                                      )
+
+            # cv2.imshow('MediaPipe Feed',image)
 
             if cv2.waitKey(0) & 0xFF == ord('q'):
                 break
@@ -252,16 +395,18 @@ def extractKeypoint(path):
         cv2.destroyAllWindows()
     return landmarks, keypoints, angle, image
 
-
-
 def compare_pose(image, angle_point, angle_user, angle_target):
+
             angle_user = np.array(angle_user)
             angle_target = np.array(angle_target)
             angle_point = np.array(angle_point)
             stage = 0
             cv2.rectangle(image, (0, 0), (370, 40), (255, 255, 255), -1)
             cv2.rectangle(image, (0, 40), (370, 370), (255, 255, 255), -1)
-            cv2.putText(image, str("Score:"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+
+            # Noted that cv2.putText can only display English characters and not Chinese characters
+            # We should convert it into chinese encoder
+            cv2.putText(image, str("Score"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
             height, width, _ = image.shape
 
             if angle_user[0] < (angle_target[0] - 15):
@@ -400,170 +545,9 @@ def dif_compare(x,y):
 
 def diff_compare_angle(x,y):
     new_x = []
-    for i, j in zip(range(len(x)), range(len(y))):
-        z = np.abs(x[i] - y[j])/((x[i] + y[j])/2)
+    for i,j in zip(range(len(x)),range(len(y))):
+        z = np.abs(x[i] - y[j])/((x[i]+ y[j])/2)
         new_x.append(z)
         #print(new_x[i])
     return Average(new_x)
-
-def convert_data(landmarks):
-    df = pd.DataFrame(columns = ['x', 'y', 'z', 'vis'])
-    for i in range(len(landmarks)):
-        df = df.append({"x": landmarks[i].x,
-                        "y": landmarks[i].y,
-                        "z": landmarks[i].z,
-                        "vis": landmarks[i].visibility
-                        }, ignore_index= True)
-    return df
-
-
-cap = cv2.VideoCapture(0)  # 捕获摄像头设备
-path = "pic/test.jpg"  # "Video/yoga19.jpg"  # 图片路径
-path_static = "static_pic" # 需要检验的一批静态图路径
-x = extractKeypoint(path)  # 进入extractKeypoint函数：提取关键点
-dim = (960, 760)
-resized = cv2.resize(x[3], dim, interpolation=cv2.INTER_AREA)
-cv2.imshow('target', resized)
-angle_target = x[2]
-point_target = x[1]
-
-IMAGE_FILES = [path_static]
-with mp_pose.Pose(static_image_mode=1, min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
-    for filename in os.listdir(path_static):
-    # while cap.isOpened():
-        ret = True
-        image = cv2.imread(path_static + '/' + filename)
-        # ret, frame = cap.read()
-        # image = cv2.imread(frame)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image.flags.writeable = False
-        results = pose.process(image)
-
-        image.flags.writeable = True
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-        image_height, image_width, _ = image.shape
-        image = cv2.resize(image, (int(image_width * (860 / image_height)), 860))
-        # finding the distance by calling function
-        # Distance distance finder function need
-        # these arguments the Focal_Length,
-        # Known_width(centimeters),
-        # and Known_distance(centimeters)
-
-        try:
-            landmarks = results.pose_landmarks.landmark
-
-            shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
-                        landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y,
-                        landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].z,
-                        round(landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].visibility * 100, 2)]
-            elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
-                     landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y,
-                     landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].z,
-                     round(landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].visibility * 100, 2)]
-            wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,
-                     landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y,
-                     landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].z,
-                     round(landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].visibility * 100, 2)]
-
-            angle_point = []
-
-            right_elbow = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,
-                           landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y]
-            angle_point.append(right_elbow)
-
-            left_elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
-                          landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
-            angle_point.append(left_elbow)
-
-            right_shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
-                              landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
-            angle_point.append(right_shoulder)
-
-            left_shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
-                             landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
-            angle_point.append(left_shoulder)
-
-            right_wrist = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x,
-                           landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
-
-            left_wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,
-                          landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
-
-            right_hip = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
-                         landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
-            angle_point.append(right_hip)
-
-            left_hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x,
-                        landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
-            angle_point.append(left_hip)
-
-            right_knee = [landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].x,
-                          landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].y]
-            angle_point.append(right_knee)
-
-            left_knee = [landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].x,
-                         landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].y]
-            angle_point.append(left_knee)
-            right_ankle = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
-                           landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y]
-
-            left_ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x,
-                          landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
-
-            keypoints = []
-            for point in landmarks:
-                keypoints.append({
-                    'X': point.x,
-                    'Y': point.y,
-                    'Z': point.z,
-                })
-
-            p_score = dif_compare(keypoints, point_target)
-
-            angle = []
-
-            angle1 = calculateAngle(right_shoulder, right_elbow, right_wrist)
-            angle.append(int(angle1))
-            angle2 = calculateAngle(left_shoulder, left_elbow, left_wrist)
-            angle.append(int(angle2))
-            angle3 = calculateAngle(right_elbow, right_shoulder, right_hip)
-            angle.append(int(angle3))
-            angle4 = calculateAngle(left_elbow, left_shoulder, left_hip)
-            angle.append(int(angle4))
-            angle5 = calculateAngle(right_shoulder, right_hip, right_knee)
-            angle.append(int(angle5))
-            angle6 = calculateAngle(left_shoulder, left_hip, left_knee)
-            angle.append(int(angle6))
-            angle7 = calculateAngle(right_hip, right_knee, right_ankle)
-            angle.append(int(angle7))
-            angle8 = calculateAngle(left_hip, left_knee, left_ankle)
-            angle.append(int(angle8))
-
-            compare_pose(image, angle_point, angle, angle_target)
-            a_score = diff_compare_angle(angle, angle_target)
-
-            if (p_score >= a_score):
-                cv2.putText(image, str(int((1 - a_score) * 100)), (80, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
-                            cv2.LINE_AA)
-
-            else:
-                cv2.putText(image, str(int((1 - p_score) * 100)), (80, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
-                            cv2.LINE_AA)
-
-        except:
-            pass
-
-        mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
-                                  mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=4, circle_radius=4),
-                                  mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=3, circle_radius=3)
-                                  )
-        cv2.imshow('AI Exercise', image)
-        cv2.imwrite(filename, image)
-
-        if cv2.waitKey(10000) & 0xFF == ord('q'):
-            break
-
-    # cap.release()
-    cv2.destroyAllWindows()
-
 
