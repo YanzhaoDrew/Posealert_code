@@ -5,7 +5,8 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButto
 class AI_Fitness_UI(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AI Fitness")
+        self.setWindowTitle('AIFitness')
+        self.resize(800, 600)
 
         button1 = QPushButton("Yoga")
         button2 = QPushButton("Hit")
@@ -25,7 +26,7 @@ class AI_Fitness_UI(QWidget):
     def posewin(self):
         inputpath = "pic/test.jpg"
         posecompare(inputpath)
-        self.hide()
+        self.close()
 
     def fitwin(self):
         inputpath = "pic/video.mp4"
