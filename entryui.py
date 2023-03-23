@@ -10,7 +10,6 @@ class AI_Fitness_UI(QWidget):
         button1 = QPushButton("Yoga")
         button2 = QPushButton("Hit")
 
-
         layout = QVBoxLayout()
         layout.addWidget(button1)
         layout.addWidget(button2)
@@ -26,15 +25,11 @@ class AI_Fitness_UI(QWidget):
     def posewin(self):
         inputpath = "pic/test.jpg"
         posecompare(inputpath)
-      #  self.w = PoseAlert(inputpath)
-      #  self.w.show()
         self.hide()
 
     def fitwin(self):
         inputpath = "pic/video.mp4"
         posecompare(inputpath)
-        #  self.w = PoseAlert(inputpath)
-        #  self.w.show()
         self.hide()
 
 

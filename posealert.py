@@ -387,8 +387,6 @@ def extractKeypoint(path):
 
                                       )
 
-            # cv2.imshow('MediaPipe Feed',image)
-
             if cv2.waitKey(0) & 0xFF == ord('q'):
                 break
 
@@ -520,16 +518,15 @@ def compare_pose(image, angle_point, angle_user, angle_target):
                 cv2.putText(image, str("Reduce the angle at left knee"), (10, 360), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                             [0, 153, 0], 2, cv2.LINE_AA)
                 cv2.circle(image, (int(angle_point[7][0] * width), int(angle_point[7][1] * height)), 30, (0, 0, 255), 5)
-
-            if stage != 0:
-                # print("FIGHTING!")
-                cv2.putText(image, str("FIGHTING!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+            if stage < 2 :
+                cv2.putText(image, str("Great!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
                             cv2.LINE_AA)
+            elif 2 < stage < 5:
+                cv2.putText(image, str("Fighting!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2, cv2.LINE_AA)
 
-                pass
-            else:
-                # print("PERFECT")
-                cv2.putText(image, str("PERFECT"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2, cv2.LINE_AA)
+            elif stage > 5:
+                cv2.putText(image, str("Dangerous!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+                            cv2.LINE_AA)
 
 def Average(lst):
      return sum(lst) / len(lst)

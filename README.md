@@ -1,2 +1,3 @@
 # Posealert_code
-Latest code, if have some problems, you can ask me.
+run entryui
+type q to quit the sub window
