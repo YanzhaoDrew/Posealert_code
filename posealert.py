@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import math
 from scipy import spatial
+import threading
+import queue
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
@@ -12,67 +14,33 @@ mp_pose = mp.solutions.pose
 class videocompare:
     def __init__(self, targetpath):
 
+        capqueue = queue.Queue()
+        tqueue = queue.Queue()
+
         # Main function starts here
         cap = cv2.VideoCapture(0)
         target_cap = cv2.VideoCapture(targetpath)
 
-        # start the real-time pose detection and compare to the target
-        with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
 
-            while cap.isOpened():
-                success, realtime_frame = cap.read()
-                ret, target_frame = target_cap.read()
+        # Create threads for each function
+        camera_thread = threading.Thread(target=detect_pose, args=(cap,capqueue))
+        target_thread = threading.Thread(target=detect_video, args=(target_cap,tqueue))
+  #      compare_thread = threading.Thread(target=compare_poses, args=(capqueue.get(), tqueue.get()))
 
-                if not success:
-                    print("Something error with your camera.")
-                    continue
+        camera_thread.start()
+        target_thread.start()
+  #      compare_thread.start()
 
-                if not ret:
-                    print('Error reading video frame')
-                    exit()
+        camera_thread.join()
+        target_thread.join()
+   #     compare_thread.join()
 
-
-                # target window screen height and width
-                dim = (960, 760)
-                resized = cv2.resize(target_frame, dim, interpolation=cv2.INTER_AREA)
-
-                # display the video frame
-                cv2.imshow('target_video', resized)
+        cap.release()
+        target_cap.release()
+        cv2.destroyAllWindows()
+        exit()
 
 
-                # read frame image from real-time camera
-                image = cv2.cvtColor(realtime_frame, cv2.COLOR_BGR2RGB)
-
-                # set flag non-writeable and record the result arrays
-                image.flags.writeable = False
-                results = pose.process(image)
-
-                # if we want to draw landmarks we need to make it writeable
-                image.flags.writeable = True
-                image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-                # shape is a tuple of three values (height, width, channels) ,_ is hold for the channel,
-                image_height, image_width, _ = image.shape
-                image = cv2.resize(image, (int(image_width * (860 / image_height)), 860))
-
-                try:
-                    compare_frame(realtime_frame, target_frame)
-
-                except:
-                    pass
-
-                mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
-                                          mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=4, circle_radius=4),
-                                          mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=3, circle_radius=3)
-                                          )
-
-
-                cv2.imshow('AI Exercise', image)
-
-                if cv2.waitKey(10) & 0xFF == ord('q'):
-                    cap.release()
-                    cv2.destroyAllWindows()
-                    break
 class posecompare:
     def __init__(self, targetpath):
 
@@ -92,6 +60,7 @@ class posecompare:
         with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
             while cap.isOpened():
                 success, frame = cap.read()
+                frame = cv2.flip(frame, 1)
 
                 if not success:
                     print("Something error with your camera.")
@@ -613,5 +582,233 @@ def diff_compare_angle(x,y):
     return Average(new_x)
 
 
-def compare_frame(camera_frame, target_frame):
+def compare_frame(camera_frame_image, target_frame_image):
     return 0
+
+def detect_pose(cap, queue):
+    # start the real-time pose detection and compare to the target
+    with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+        while cap.isOpened():
+            success, frame = cap.read()
+            frame = cv2.flip(frame, 1)
+
+            if not success:
+                print("Something error with your camera.")
+                continue
+
+            # read frame image from real-time camera
+            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # set flag non-writeable and record the result arrays
+            image.flags.writeable = False
+            results = pose.process(image)
+
+            # if we want to draw landmarks we need to make it writeable
+            image.flags.writeable = True
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+            # shape is a tuple of three values (height, width, channels) ,_ is hold for the channel,
+            image_height, image_width, _ = image.shape
+            image = cv2.resize(image, (int(image_width * (860 / image_height)), 860))
+
+            try:
+                cv2.putText(image, str("Excellent!"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
+                            cv2.LINE_AA)
+                mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                                          mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=4, circle_radius=4),
+                                          mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=3, circle_radius=3)
+                                          )
+
+                landmarks = results.pose_landmarks.landmark
+
+                left_shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
+                                 landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
+
+                left_elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
+                              landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
+
+                left_wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,
+                              landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
+
+                right_shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
+                                  landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
+
+                right_elbow = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,
+                               landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y]
+
+                right_wrist = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x,
+                               landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
+
+                left_hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x,
+                            landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
+
+                left_knee = [landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].x,
+                             landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].y]
+
+                left_ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x,
+                              landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
+
+                right_hip = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
+                             landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
+
+                right_knee = [landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].x,
+                              landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].y]
+
+                right_ankle = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
+                               landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y]
+
+                keypoints = []
+                for point in landmarks:
+                    keypoints.append({
+                        'X': point.x,
+                        'Y': point.y,
+                        'Z': point.z,
+                    })
+
+                angle = []
+                angle1 = calculateAngle(right_shoulder, right_elbow, right_wrist)
+                angle.append(int(angle1))
+                angle2 = calculateAngle(left_shoulder, left_elbow, left_wrist)
+                angle.append(int(angle2))
+                angle3 = calculateAngle(right_elbow, right_shoulder, right_hip)
+                angle.append(int(angle3))
+                angle4 = calculateAngle(left_elbow, left_shoulder, left_hip)
+                angle.append(int(angle4))
+                angle5 = calculateAngle(right_shoulder, right_hip, right_knee)
+                angle.append(int(angle5))
+                angle6 = calculateAngle(left_shoulder, left_hip, left_knee)
+                angle.append(int(angle6))
+                angle7 = calculateAngle(right_hip, right_knee, right_ankle)
+                angle.append(int(angle7))
+                angle8 = calculateAngle(left_hip, left_knee, left_ankle)
+                angle.append(int(angle8))
+
+                queue.put(angle)
+
+            except:
+                pass
+
+            cv2.imshow('AI Exercise', image)
+
+            if cv2.waitKey(10) & 0xFF == ord('q'):
+                queue.put(None)
+                cap.release()
+                break
+
+def detect_video(cap, queue):
+
+    # start the real-time pose detection and compare to the target
+    with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+        while cap.isOpened():
+            success, frame = cap.read()
+            frame = cv2.flip(frame, 1)
+
+            if not success:
+                print("Something error with your camera.")
+                continue
+
+            # read frame image from real-time camera
+            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # set flag non-writeable and record the result arrays
+            image.flags.writeable = False
+            results = pose.process(image)
+
+            # if we want to draw landmarks we need to make it writeable
+            image.flags.writeable = True
+            cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+            # target window screen height and width
+            dim = (960, 760)
+            image = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+
+            try:
+                cv2.putText(image, str("Excellent!"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
+                            cv2.LINE_AA)
+                mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
+                                          mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=4, circle_radius=4),
+                                          mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=3, circle_radius=3)
+                                          )
+
+                landmarks = results.pose_landmarks.landmark
+
+                left_shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
+                                 landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
+
+                left_elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
+                              landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
+
+                left_wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,
+                              landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
+
+                right_shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
+                                  landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
+
+                right_elbow = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,
+                               landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y]
+
+                right_wrist = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x,
+                               landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
+
+                left_hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x,
+                            landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
+
+                left_knee = [landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].x,
+                             landmarks[mp_pose.PoseLandmark.LEFT_KNEE.value].y]
+
+                left_ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x,
+                              landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
+
+                right_hip = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
+                             landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
+
+                right_knee = [landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].x,
+                              landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].y]
+
+                right_ankle = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
+                               landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y]
+
+                keypoints = []
+                for point in landmarks:
+                    keypoints.append({
+                        'X': point.x,
+                        'Y': point.y,
+                        'Z': point.z,
+                    })
+
+                angle = []
+                angle1 = calculateAngle(right_shoulder, right_elbow, right_wrist)
+                angle.append(int(angle1))
+                angle2 = calculateAngle(left_shoulder, left_elbow, left_wrist)
+                angle.append(int(angle2))
+                angle3 = calculateAngle(right_elbow, right_shoulder, right_hip)
+                angle.append(int(angle3))
+                angle4 = calculateAngle(left_elbow, left_shoulder, left_hip)
+                angle.append(int(angle4))
+                angle5 = calculateAngle(right_shoulder, right_hip, right_knee)
+                angle.append(int(angle5))
+                angle6 = calculateAngle(left_shoulder, left_hip, left_knee)
+                angle.append(int(angle6))
+                angle7 = calculateAngle(right_hip, right_knee, right_ankle)
+                angle.append(int(angle7))
+                angle8 = calculateAngle(left_hip, left_knee, left_ankle)
+                angle.append(int(angle8))
+
+                queue.put(angle)
+
+            except:
+                pass
+
+                # display the video frame
+            cv2.imshow('target_video', image)
+
+            if cv2.waitKey(10) & 0xFF == ord('q'):
+                queue.put(None)
+                cap.release()
+                break
+
+
+def compare_poses(cap, target_cap):
+    # ... pose comparison code ...
+    return 0
+
