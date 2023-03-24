@@ -1,5 +1,5 @@
 import sys
-from posealert import posecompare
+from posealert import posecompare,videocompare
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QMessageBox
 
 class AI_Fitness_UI(QWidget):
@@ -29,9 +29,9 @@ class AI_Fitness_UI(QWidget):
         self.close()
 
     def fitwin(self):
-        inputpath = "pic/video.mp4"
-        posecompare(inputpath)
-        self.hide()
+        inputpath = "pic/zumba.mp4"
+        videocompare(inputpath)
+        self.close()
 
 
 class PoseAlert(QWidget):
