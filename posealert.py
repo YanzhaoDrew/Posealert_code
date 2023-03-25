@@ -12,26 +12,26 @@ mp_pose = mp.solutions.pose
 capqueue = queue.Queue()
 tqueue = queue.Queue()
 
+
 class videocompare:
     def __init__(self, targetpath):
-
         # Main function starts here
         cap = cv2.VideoCapture(0)
         target_cap = cv2.VideoCapture(targetpath)
 
-
         # Create threads for each function
-        target_thread = threading.Thread(target=detect_video, args=(target_cap, tqueue))
         camera_thread = threading.Thread(target=detect_pose, args=(cap, capqueue))
-        target_thread.start()
+        target_thread = threading.Thread(target=detect_video, args=(target_cap, tqueue))
+
         camera_thread.start()
+        target_thread.start()
 
         # Compare thread can start
         compare_thread = threading.Thread(target=compare_angle, args=(capqueue, tqueue))
         compare_thread.start()
 
-        target_thread.join()
         camera_thread.join()
+        target_thread.join()
         compare_thread.join()
 
         cap.release()
@@ -201,6 +201,7 @@ class posecompare:
                     cv2.destroyAllWindows()
                     break
 
+
 def calculateAngle(a, b, c):
     a = np.array(a)
     b = np.array(b)
@@ -284,7 +285,6 @@ def extractKeypoint(path):
                         'vis': data_point.visibility
                     }, index=[0])
                     joint_list = pd.concat([joint_list, joints], ignore_index=True)
-
 
                 keypoints = []
                 for point in landmarks:
@@ -425,164 +425,168 @@ def extractKeypoint(path):
         cv2.destroyAllWindows()
     return landmarks, keypoints, angle, image
 
+
 def compare_pose(image, angle_point, angle_user, angle_target):
+    angle_user = np.array(angle_user)
+    angle_target = np.array(angle_target)
+    angle_point = np.array(angle_point)
+    stage = 0
+    cv2.rectangle(image, (0, 0), (370, 40), (255, 255, 255), -1)
+    cv2.rectangle(image, (0, 40), (370, 370), (255, 255, 255), -1)
 
-            angle_user = np.array(angle_user)
-            angle_target = np.array(angle_target)
-            angle_point = np.array(angle_point)
-            stage = 0
-            cv2.rectangle(image, (0, 0), (370, 40), (255, 255, 255), -1)
-            cv2.rectangle(image, (0, 40), (370, 370), (255, 255, 255), -1)
+    # Noted that cv2.putText can only display English characters and not Chinese characters
+    # We should convert it into chinese encoder
+    cv2.putText(image, str("Score"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+    height, width, _ = image.shape
 
-            # Noted that cv2.putText can only display English characters and not Chinese characters
-            # We should convert it into chinese encoder
-            cv2.putText(image, str("Score"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
-            height, width, _ = image.shape
+    if angle_user[0] < (angle_target[0] - 15):
+        # print("Extend the right arm at elbow")
+        stage = stage + 1
+        cv2.putText(image, str("Extend the right arm at elbow"), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[0][0] * width), int(angle_point[0][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[0] < (angle_target[0] - 15):
-                # print("Extend the right arm at elbow")
-                stage = stage + 1
-                cv2.putText(image, str("Extend the right arm at elbow"), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[0][0] * width), int(angle_point[0][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[0] > (angle_target[0] + 15):
+        # print("Fold the right arm at elbow")
+        stage = stage + 1
+        cv2.putText(image, str("Fold the right arm at elbow"), (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[0][0] * width), int(angle_point[0][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[0] > (angle_target[0] + 15):
-                # print("Fold the right arm at elbow")
-                stage = stage + 1
-                cv2.putText(image, str("Fold the right arm at elbow"), (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[0][0] * width), int(angle_point[0][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[1] < (angle_target[1] - 15):
+        # print("Extend the left arm at elbow")
+        stage = stage + 1
+        cv2.putText(image, str("Extend the left arm at elbow"), (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[1][0] * width), int(angle_point[1][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[1] < (angle_target[1] - 15):
-                # print("Extend the left arm at elbow")
-                stage = stage + 1
-                cv2.putText(image, str("Extend the left arm at elbow"), (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[1][0] * width), int(angle_point[1][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[1] > (angle_target[1] + 15):
+        # print("Fold the left arm at elbow")
+        stage = stage + 1
+        cv2.putText(image, str("Fold the left arm at elbow"), (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[1][0] * width), int(angle_point[1][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[1] > (angle_target[1] + 15):
-                # print("Fold the left arm at elbow")
-                stage = stage + 1
-                cv2.putText(image, str("Fold the left arm at elbow"), (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[1][0] * width), int(angle_point[1][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[2] < (angle_target[2] - 15):
+        # print("Lift your right arm")
+        stage = stage + 1
+        cv2.putText(image, str("Lift your right arm"), (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
+                    cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[2][0] * width), int(angle_point[2][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[2] < (angle_target[2] - 15):
-                # print("Lift your right arm")
-                stage = stage + 1
-                cv2.putText(image, str("Lift your right arm"), (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
-                            cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[2][0] * width), int(angle_point[2][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[2] > (angle_target[2] + 15):
+        # print("Put your arm down a little")
+        stage = stage + 1
+        cv2.putText(image, str("Put your arm down a little"), (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[2][0] * width), int(angle_point[2][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[2] > (angle_target[2] + 15):
-                # print("Put your arm down a little")
-                stage = stage + 1
-                cv2.putText(image, str("Put your arm down a little"), (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[2][0] * width), int(angle_point[2][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[3] < (angle_target[3] - 15):
+        # print("Lift your left arm")
+        stage = stage + 1
+        cv2.putText(image, str("Lift your left arm"), (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
+                    cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[3][0] * width), int(angle_point[3][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[3] < (angle_target[3] - 15):
-                # print("Lift your left arm")
-                stage = stage + 1
-                cv2.putText(image, str("Lift your left arm"), (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
-                            cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[3][0] * width), int(angle_point[3][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[3] > (angle_target[3] + 15):
+        # print("Put your arm down a little")
+        stage = stage + 1
+        cv2.putText(image, str("Put your arm down a little"), (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[3][0] * width), int(angle_point[3][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[3] > (angle_target[3] + 15):
-                # print("Put your arm down a little")
-                stage = stage + 1
-                cv2.putText(image, str("Put your arm down a little"), (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[3][0] * width), int(angle_point[3][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[4] < (angle_target[4] - 15):
+        # print("Extend the angle at right hip")
+        stage = stage + 1
+        cv2.putText(image, str("Extend the angle at right hip"), (10, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[4][0] * width), int(angle_point[4][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[4] < (angle_target[4] - 15):
-                # print("Extend the angle at right hip")
-                stage = stage + 1
-                cv2.putText(image, str("Extend the angle at right hip"), (10, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[4][0] * width), int(angle_point[4][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[4] > (angle_target[4] + 15):
+        # print("Reduce the angle at right hip")
+        stage = stage + 1
+        cv2.putText(image, str("Reduce the angle of at right hip"), (10, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[4][0] * width), int(angle_point[4][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[4] > (angle_target[4] + 15):
-                # print("Reduce the angle at right hip")
-                stage = stage + 1
-                cv2.putText(image, str("Reduce the angle of at right hip"), (10, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[4][0] * width), int(angle_point[4][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[5] < (angle_target[5] - 15):
+        # print("Extend the angle at left hip")
+        stage = stage + 1
+        cv2.putText(image, str("Extend the angle at left hip"), (10, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[5][0] * width), int(angle_point[5][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[5] < (angle_target[5] - 15):
-                # print("Extend the angle at left hip")
-                stage = stage + 1
-                cv2.putText(image, str("Extend the angle at left hip"), (10, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[5][0] * width), int(angle_point[5][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[5] > (angle_target[5] + 15):
+        # print("Reduce the angle at left hip")
+        stage = stage + 1
+        cv2.putText(image, str("Reduce the angle at left hip"), (10, 280), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[5][0] * width), int(angle_point[5][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[5] > (angle_target[5] + 15):
-                # print("Reduce the angle at left hip")
-                stage = stage + 1
-                cv2.putText(image, str("Reduce the angle at left hip"), (10, 280), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[5][0] * width), int(angle_point[5][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[6] < (angle_target[6] - 15):
+        # print("Extend the angle of right knee")
+        stage = stage + 1
+        cv2.putText(image, str("Extend the angle of right knee"), (10, 300), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[6][0] * width), int(angle_point[6][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[6] < (angle_target[6] - 15):
-                # print("Extend the angle of right knee")
-                stage = stage + 1
-                cv2.putText(image, str("Extend the angle of right knee"), (10, 300), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[6][0] * width), int(angle_point[6][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[6] > (angle_target[6] + 15):
+        # print("Reduce the angle of right knee")
+        stage = stage + 1
+        cv2.putText(image, str("Reduce the angle at right knee"), (10, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[6][0] * width), int(angle_point[6][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[6] > (angle_target[6] + 15):
-                # print("Reduce the angle of right knee")
-                stage = stage + 1
-                cv2.putText(image, str("Reduce the angle at right knee"), (10, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[6][0] * width), int(angle_point[6][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[7] < (angle_target[7] - 15):
+        # print("Extend the angle at left knee")
+        stage = stage + 1
+        cv2.putText(image, str("Extend the angle at left knee"), (10, 340), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[7][0] * width), int(angle_point[7][1] * height)), 30, (0, 0, 255), 5)
 
-            if angle_user[7] < (angle_target[7] - 15):
-                # print("Extend the angle at left knee")
-                stage = stage + 1
-                cv2.putText(image, str("Extend the angle at left knee"), (10, 340), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[7][0] * width), int(angle_point[7][1] * height)), 30, (0, 0, 255), 5)
+    if angle_user[7] > (angle_target[7] + 15):
+        # print("Reduce the angle at left knee")
+        stage = stage + 1
+        cv2.putText(image, str("Reduce the angle at left knee"), (10, 360), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    [0, 153, 0], 2, cv2.LINE_AA)
+        cv2.circle(image, (int(angle_point[7][0] * width), int(angle_point[7][1] * height)), 30, (0, 0, 255), 5)
+    if stage < 2:
+        cv2.putText(image, str("Great!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+                    cv2.LINE_AA)
+    elif 2 < stage < 5:
+        cv2.putText(image, str("Fighting!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2, cv2.LINE_AA)
 
-            if angle_user[7] > (angle_target[7] + 15):
-                # print("Reduce the angle at left knee")
-                stage = stage + 1
-                cv2.putText(image, str("Reduce the angle at left knee"), (10, 360), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            [0, 153, 0], 2, cv2.LINE_AA)
-                cv2.circle(image, (int(angle_point[7][0] * width), int(angle_point[7][1] * height)), 30, (0, 0, 255), 5)
-            if stage < 2 :
-                cv2.putText(image, str("Great!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
-                            cv2.LINE_AA)
-            elif 2 < stage < 5:
-                cv2.putText(image, str("Fighting!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2, cv2.LINE_AA)
+    elif stage > 5:
+        cv2.putText(image, str("Dangerous!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+                    cv2.LINE_AA)
 
-            elif stage > 5:
-                cv2.putText(image, str("Dangerous!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
-                            cv2.LINE_AA)
 
 def Average(lst):
-     return sum(lst) / len(lst)
+    return sum(lst) / len(lst)
 
-def dif_compare(x,y):
+
+def dif_compare(x, y):
     average = []
-    for i,j in zip(range(len(list(x))),range(len(list(y)))):
-        result = 1 - spatial.distance.cosine(list(x[i].values()),list(y[j].values()))
+    for i, j in zip(range(len(list(x))), range(len(list(y)))):
+        result = 1 - spatial.distance.cosine(list(x[i].values()), list(y[j].values()))
         average.append(result)
-    score = math.sqrt(2*(1-round(Average(average),2)))
-    #print(Average(average))
+    score = math.sqrt(2 * (1 - round(Average(average), 2)))
+    # print(Average(average))
     return score
 
-def diff_compare_angle(x,y):
+
+def diff_compare_angle(x, y):
     new_x = []
-    for i,j in zip(range(len(x)),range(len(y))):
-        z = np.abs(x[i] - y[j])/((x[i]+ y[j])/2)
+    for i, j in zip(range(len(x)), range(len(y))):
+        z = np.abs(x[i] - y[j]) / ((x[i] + y[j]) / 2)
         new_x.append(z)
-        #print(new_x[i])
+        # print(new_x[i])
     return Average(new_x)
 
 
 def compare_frame(camera_frame_image, target_frame_image):
     return 0
+
 
 def detect_pose(cap, queue):
     # start the real-time pose detection and compare to the target
@@ -695,8 +699,10 @@ def detect_pose(cap, queue):
                 cap.release()
                 break
 
-def detect_video(cap, queue):
+        queue.put(None)
 
+
+def detect_video(cap, queue):
     # start the real-time pose detection and compare to the target
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         while cap.isOpened():
@@ -807,95 +813,49 @@ def detect_video(cap, queue):
                 cap.release()
                 break
 
-def compare_angle(capqueue,tqueue):
+        queue.put(None)
 
+
+def compare_angle(capqueue, tqueue):
     while True:
-        stage = 0
+
         cap = capqueue.get()
         target = tqueue.get()
 
+        if cap is None or target is None:
+            break
+
         img = np.zeros((512, 512, 3), np.uint8)
-        font = cv2.FONT_HERSHEY_SIMPLEX
 
-        if cap[0] < (target[0] - 15):
-            # print("Extend the right arm at elbow")
-            stage = stage + 1
+        # calculate Z-scores for each array
+        z_cap = (cap - np.mean(cap)) / np.std(cap)
+        z_target = (target - np.mean(target)) / np.std(target)
 
-        if cap[0] > (target[0] + 15):
-            # print("Fold the right arm at elbow")
-            stage = stage + 1
+        # calculate absolute differences between Z-scores
+        diff = np.abs(z_cap - z_target)
 
-        if cap[1] < (target[1] - 15):
-            # print("Extend the left arm at elbow")
-            stage = stage + 1
+        # normalize differences to range of [0,1] using min-max scaling
+        diff_norm = (diff - np.min(diff)) / (np.max(diff) - np.min(diff))
 
-        if cap[1] > (target[1] + 15):
-            # print("Fold the left arm at elbow")
-            stage = stage + 1
+        # calculate the average of diff_norm
+        avg_diff_norm = np.mean(diff_norm)
 
-        if cap[2] < (target[2] - 15):
-            # print("Lift your right arm")
-            stage = stage + 1
-
-        if cap[2] > (target[2] + 15):
-            # print("Put your arm down a little")
-            stage = stage + 1
-
-        if cap[3] < (target[3] - 15):
-            # print("Lift your left arm")
-            stage = stage + 1
-
-        if cap[3] > (target[3] + 15):
-            # print("Put your arm down a little")
-            stage = stage + 1
-
-        if cap[4] < (target[4] - 15):
-            # print("Extend the angle at right hip")
-            stage = stage + 1
-
-        if cap[4] > (target[4] + 15):
-            # print("Reduce the angle at right hip")
-            stage = stage + 1
-
-        if cap[5] < (target[5] - 15):
-            # print("Extend the angle at left hip")
-            stage = stage + 1
-
-        if cap[5] > (target[5] + 15):
-            # print("Reduce the angle at left hip")
-            stage = stage + 1
-
-        if cap[6] < (target[6] - 15):
-            # print("Extend the angle of right knee")
-            stage = stage + 1
-
-        if cap[6] > (target[6] + 15):
-            # print("Reduce the angle of right knee")q
-            stage = stage + 1
-
-        if cap[7] < (target[7] - 15):
-            # print("Extend the angle at left knee")
-            #cv2.putText(img, 'Extend the angle at left knee', (100, 256), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
-            stage = stage + 1
-
-        if cap[7] > (target[7] + 15):
-            # print("Reduce the angle at left knee")
-           # cv2.putText(img, 'Reduce the angle at left knee', (100, 256), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
-            stage = stage + 1
-
-        if stage < 2:
-            cv2.putText(img, str("Great!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+        if avg_diff_norm > 0.28:
+            cv2.putText(img, str("Get Up and move!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
                         cv2.LINE_AA)
-        elif 2 < stage < 4:
+
+        elif 0.15 < avg_diff_norm < 0.28:
             cv2.putText(img, str("Fighting!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2, cv2.LINE_AA)
 
-        elif stage > 4:
-            cv2.putText(img, str("Dangerous!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+        else:
+            cv2.putText(img, str("Good!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
                         cv2.LINE_AA)
 
         # Display the image in a window
         cv2.imshow('Score', img)
 
+        # better performance from including time sleep
+        #   time.sleep(0.05)
+
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
-
