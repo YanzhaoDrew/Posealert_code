@@ -9,13 +9,11 @@ import queue
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
-
+capqueue = queue.Queue()
+tqueue = queue.Queue()
 
 class videocompare:
     def __init__(self, targetpath):
-
-        capqueue = queue.Queue()
-        tqueue = queue.Queue()
 
         # Main function starts here
         cap = cv2.VideoCapture(0)
@@ -23,17 +21,18 @@ class videocompare:
 
 
         # Create threads for each function
-        camera_thread = threading.Thread(target=detect_pose, args=(cap,capqueue))
-        target_thread = threading.Thread(target=detect_video, args=(target_cap,tqueue))
-  #      compare_thread = threading.Thread(target=compare_poses, args=(capqueue.get(), tqueue.get()))
-
-        camera_thread.start()
+        target_thread = threading.Thread(target=detect_video, args=(target_cap, tqueue))
+        camera_thread = threading.Thread(target=detect_pose, args=(cap, capqueue))
         target_thread.start()
-  #      compare_thread.start()
+        camera_thread.start()
 
-        camera_thread.join()
+        # Compare thread can start
+        compare_thread = threading.Thread(target=compare_angle, args=(capqueue, tqueue))
+        compare_thread.start()
+
         target_thread.join()
-   #     compare_thread.join()
+        camera_thread.join()
+        compare_thread.join()
 
         cap.release()
         target_cap.release()
@@ -612,6 +611,7 @@ def detect_pose(cap, queue):
             image = cv2.resize(image, (int(image_width * (860 / image_height)), 860))
 
             try:
+
                 cv2.putText(image, str("Excellent!"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
                             cv2.LINE_AA)
                 mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
@@ -723,7 +723,7 @@ def detect_video(cap, queue):
             image = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
 
             try:
-                cv2.putText(image, str("Excellent!"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
+                cv2.putText(image, str("Follow me!"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
                             cv2.LINE_AA)
                 mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
                                           mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=4, circle_radius=4),
@@ -807,8 +807,95 @@ def detect_video(cap, queue):
                 cap.release()
                 break
 
+def compare_angle(capqueue,tqueue):
 
-def compare_poses(cap, target_cap):
-    # ... pose comparison code ...
-    return 0
+    while True:
+        stage = 0
+        cap = capqueue.get()
+        target = tqueue.get()
+
+        img = np.zeros((512, 512, 3), np.uint8)
+        font = cv2.FONT_HERSHEY_SIMPLEX
+
+        if cap[0] < (target[0] - 15):
+            # print("Extend the right arm at elbow")
+            stage = stage + 1
+
+        if cap[0] > (target[0] + 15):
+            # print("Fold the right arm at elbow")
+            stage = stage + 1
+
+        if cap[1] < (target[1] - 15):
+            # print("Extend the left arm at elbow")
+            stage = stage + 1
+
+        if cap[1] > (target[1] + 15):
+            # print("Fold the left arm at elbow")
+            stage = stage + 1
+
+        if cap[2] < (target[2] - 15):
+            # print("Lift your right arm")
+            stage = stage + 1
+
+        if cap[2] > (target[2] + 15):
+            # print("Put your arm down a little")
+            stage = stage + 1
+
+        if cap[3] < (target[3] - 15):
+            # print("Lift your left arm")
+            stage = stage + 1
+
+        if cap[3] > (target[3] + 15):
+            # print("Put your arm down a little")
+            stage = stage + 1
+
+        if cap[4] < (target[4] - 15):
+            # print("Extend the angle at right hip")
+            stage = stage + 1
+
+        if cap[4] > (target[4] + 15):
+            # print("Reduce the angle at right hip")
+            stage = stage + 1
+
+        if cap[5] < (target[5] - 15):
+            # print("Extend the angle at left hip")
+            stage = stage + 1
+
+        if cap[5] > (target[5] + 15):
+            # print("Reduce the angle at left hip")
+            stage = stage + 1
+
+        if cap[6] < (target[6] - 15):
+            # print("Extend the angle of right knee")
+            stage = stage + 1
+
+        if cap[6] > (target[6] + 15):
+            # print("Reduce the angle of right knee")q
+            stage = stage + 1
+
+        if cap[7] < (target[7] - 15):
+            # print("Extend the angle at left knee")
+            #cv2.putText(img, 'Extend the angle at left knee', (100, 256), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            stage = stage + 1
+
+        if cap[7] > (target[7] + 15):
+            # print("Reduce the angle at left knee")
+           # cv2.putText(img, 'Reduce the angle at left knee', (100, 256), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            stage = stage + 1
+
+        if stage < 2:
+            cv2.putText(img, str("Great!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+                        cv2.LINE_AA)
+        elif 2 < stage < 4:
+            cv2.putText(img, str("Fighting!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2, cv2.LINE_AA)
+
+        elif stage > 4:
+            cv2.putText(img, str("Dangerous!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+                        cv2.LINE_AA)
+
+        # Display the image in a window
+        cv2.imshow('Score', img)
+
+        if cv2.waitKey(10) & 0xFF == ord('q'):
+            break
 
