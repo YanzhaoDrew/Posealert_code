@@ -1,4 +1,3 @@
-import time
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -7,6 +6,7 @@ import math
 from scipy import spatial
 import threading
 import queue
+import time
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
@@ -21,15 +21,14 @@ class videocompare:
         target_cap = cv2.VideoCapture(targetpath)
 
         # Create threads for each function
-        target_thread = threading.Thread(target=detect_video, args=(target_cap, tqueue))
         camera_thread = threading.Thread(target=detect_pose, args=(cap, capqueue))
+        target_thread = threading.Thread(target=detect_video, args=(target_cap, tqueue))
 
-        target_thread.start()
         camera_thread.start()
-
+        target_thread.start()
 
         # Compare thread can start
-        compare_thread = threading.Thread(target=video_compare_pose, args=(capqueue, tqueue))
+        compare_thread = threading.Thread(target=compare_angle, args=(capqueue, tqueue))
         compare_thread.start()
 
         camera_thread.join()
@@ -598,8 +597,6 @@ def detect_pose(cap, queue):
             success, frame = cap.read()
             frame = cv2.flip(frame, 1)
 
-            # time sleep here is very important because our pose is delayq
-            time.sleep(0.05)
             if not success:
                 print("Something error with your camera.")
                 continue
@@ -692,7 +689,7 @@ def detect_pose(cap, queue):
                 angle8 = calculateAngle(left_hip, left_knee, left_ankle)
                 angle.append(int(angle8))
 
-                queue.put(keypoints)
+                queue.put(angle)
 
             except:
                 pass
@@ -705,7 +702,6 @@ def detect_pose(cap, queue):
                         cv2.LINE_AA)
 
             cv2.imshow('AI Exercise', image)
-
             if cv2.waitKey(10) & 0xFF == ord('q'):
                 queue.put(None)
                 cap.release()
@@ -722,8 +718,8 @@ def detect_video(cap, queue):
             frame = cv2.flip(frame, 1)
 
             if not success:
-                print("End of your video")
-                break
+                print("Something error with your camera.")
+                continue
 
             # read frame image from real-time camera
             image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -812,7 +808,7 @@ def detect_video(cap, queue):
                 angle8 = calculateAngle(left_hip, left_knee, left_ankle)
                 angle.append(int(angle8))
 
-                queue.put(keypoints)
+                queue.put(angle)
 
             except:
                 pass
@@ -828,54 +824,64 @@ def detect_video(cap, queue):
         queue.put(None)
 
 
-def video_compare_pose(capqueue, tqueue):
-
+def compare_angle(capqueue, tqueue):
     while True:
+
         cap = capqueue.get()
         target = tqueue.get()
-
-        # set a background
-        background_file = "./pic/back.jpg"
-        img = cv2.imread(background_file)
-        cv2.line(img, (10, 40), (10, 400), (0, 238, 238))
-        cv2.line(img, (10, 40), (40, 40), (0, 238, 238))
-        cv2.line(img, (40, 40), (40, 400), (0, 238, 238))
-        cv2.line(img, (10, 400), (40, 400), (0, 238, 238))
-        # img = np.zeros((512, 512, 3), np.uint8)
 
         if cap is None or target is None:
             break
 
-        p_score = dif_compare(cap, target)
+        # set a background
+        background_file = "./pic/back.jpg"
+        img = cv2.imread(background_file)
+        # img = np.zeros((512, 512, 3), np.uint8)
 
-        if p_score > 0.5:
-            cv2.putText(img, str("Catch up!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+        # calculate Z-scores for each array
+        # 平方差
+        z_cap = (cap - np.mean(cap)) / np.std(cap)
+        z_target = (target - np.mean(target)) / np.std(target)
+
+        # calculate absolute differences between Z-scores
+        # 平方差的差值
+        diff = np.abs(z_cap - z_target)
+
+        # normalize differences to range of [0,1] using min-max scaling
+        diff_norm = (diff - np.min(diff)) / (np.max(diff) - np.min(diff))
+
+        # calculate the average of diff_norm
+        # Only in this time, avg_diff_norm 是实数
+        avg_diff_norm = np.mean(diff_norm)
+
+        if avg_diff_norm > 0.28:
+            cv2.putText(img, str("Get Up and move!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
                         cv2.LINE_AA)
-        elif 0.5 > p_score > 0.2:
-            cv2.putText(img, str("Good!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
-                        cv2.LINE_AA)
+
+        elif 0.15 < avg_diff_norm < 0.28:
+            cv2.putText(img, str("Fighting!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2, cv2.LINE_AA)
+
         else:
-            cv2.putText(img, str("Excellent!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+            cv2.putText(img, str("Good!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
                         cv2.LINE_AA)
 
         # define per and bar
         color = (254, 118, 136)
-        per = np.interp((1 - p_score), (0, 1.0), (0, 100))
+        per = np.interp((1 - avg_diff_norm), (0, 1.0), (0, 100))
         # per = (1 - avg_diff_norm) * 100
-        bar = np.interp(1 - p_score, (0, 1.0), (400, 10))
+        bar = np.interp(1 - avg_diff_norm, (0, 1.0), (300, 10))
 
         # Draw Bar
-        cv2.putText(img, str("~p-score"), (150, 120), cv2.FONT_HERSHEY_SIMPLEX, 2, [254, 130, 145], 2, cv2.LINE_AA)
-        cv2.rectangle(img, (10, 400), (40, 400), color, cv2.FILLED)
+        cv2.putText(img, str("~Z-score"), (150, 120), cv2.FONT_HERSHEY_SIMPLEX, 2, [254, 130, 145], 2, cv2.LINE_AA)
+        cv2.rectangle(img, (10, 300), (40, 400), color, cv2.FILLED)
         cv2.rectangle(img, (10, int(bar)), (40, 400), color, cv2.FILLED)
         cv2.putText(img, f'{int(per)}', (60, 120), cv2.FONT_HERSHEY_PLAIN, 4,
                     color, 3)
-
         # Display the image in a window
         cv2.imshow('Score', img)
 
+        # better performance from including time sleep
+        #   time.sleep(0.05)
 
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
-
-
