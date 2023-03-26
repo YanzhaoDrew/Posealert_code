@@ -30,7 +30,7 @@ class videocompare:
 
 
         # Compare thread can start
-        compare_thread = threading.Thread(target=compare_pose, args=(capqueue, tqueue))
+        compare_thread = threading.Thread(target=video_compare_pose, args=(capqueue, tqueue))
         compare_thread.start()
 
         camera_thread.join()
@@ -821,7 +821,7 @@ def detect_video(cap, queue):
         queue.put(None)
 
 
-def compare_pose(capqueue, tqueue):
+def video_compare_pose(capqueue, tqueue):
 
     while True:
         cap = capqueue.get()
