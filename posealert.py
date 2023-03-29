@@ -7,12 +7,14 @@ import math
 from scipy import spatial
 import threading
 import queue
+import pyttsx3
+
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 capqueue = queue.Queue()
 tqueue = queue.Queue()
-
+p_score = 0
 
 class videocompare:
     def __init__(self, targetpath):
@@ -27,14 +29,16 @@ class videocompare:
         target_thread.start()
         camera_thread.start()
 
-
         # Compare thread can start
         compare_thread = threading.Thread(target=video_compare_pose, args=(capqueue, tqueue))
         compare_thread.start()
+        voice_thread = threading.Thread(target=voice_alert)
+        voice_thread.start()
 
         camera_thread.join()
         target_thread.join()
         compare_thread.join()
+        voice_thread.join()
 
         cap.release()
         target_cap.release()
@@ -417,9 +421,7 @@ def extractKeypoint(path):
             # Render detections
             mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
                                       mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=4, circle_radius=2),
-                                      mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=4, circle_radius=2)
-
-                                      )
+                                      mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=4, circle_radius=2))
 
             if cv2.waitKey(0) & 0xFF == ord('q'):
                 break
@@ -829,7 +831,6 @@ def detect_video(cap, queue):
 
 
 def video_compare_pose(capqueue, tqueue):
-
     while True:
         cap = capqueue.get()
         target = tqueue.get()
@@ -879,3 +880,13 @@ def video_compare_pose(capqueue, tqueue):
             break
 
 
+def voice_alert():
+    engine = pyttsx3.init()
+
+    if p_score >= 0:
+        engine.say("加油，继续保持")
+        engine.runAndWait()
+    else:
+        engine.say("危险，请调整动作")
+        engine.runAndWait()
+    engine.stop()
