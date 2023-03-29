@@ -435,8 +435,8 @@ def compare_pose(image, angle_point, angle_user, angle_target):
     angle_target = np.array(angle_target)
     angle_point = np.array(angle_point)
     stage = 0
-    cv2.rectangle(image, (0, 0), (370, 40), (255, 255, 255), -1)
-    cv2.rectangle(image, (0, 40), (370, 370), (255, 255, 255), -1)
+    # cv2.rectangle(image, (0, 0), (370, 40), (255, 255, 255), -1)
+    # cv2.rectangle(image, (0, 40), (370, 370), (255, 255, 255), -1)
 
     # Noted that cv2.putText can only display English characters and not Chinese characters
     # We should convert it into chinese encoder
@@ -721,7 +721,7 @@ def detect_video(cap, queue):
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         while cap.isOpened():
             success, frame = cap.read()
-            frame = cv2.flip(frame, 1)
+           # frame = cv2.flip(frame, 1)
 
             if not success:
                 print("End of your video")
@@ -847,6 +847,7 @@ def video_compare_pose(capqueue, tqueue):
         if cap is None or target is None:
             break
 
+        global p_score
         p_score = dif_compare(cap, target)
 
         if p_score > 0.5:
@@ -882,11 +883,22 @@ def video_compare_pose(capqueue, tqueue):
 
 def voice_alert():
     engine = pyttsx3.init()
-
-    if p_score >= 0:
-        engine.say("加油，继续保持")
-        engine.runAndWait()
-    else:
-        engine.say("危险，请调整动作")
-        engine.runAndWait()
+    time.sleep(2)
+    engine.say("3,   2,    1,   健身开始！")
+    while True:
+        if p_score < 0.5:
+            engine.say("加油，请继续保持喔")
+            engine.runAndWait()
+            time.sleep(8)
+        if p_score >= 0.6 and p_score <= 0.7:
+            engine.say("危险，请注意调整动作")
+            engine.runAndWait()
+            time.sleep(3)
+        if p_score > 0.7:
+            engine.say("注意安全，容易受伤！")
+            engine.runAndWait()
+        if p_score <= 0.2:
+            break
+        if cv2.waitKey(10) & 0xFF == ord('q'):
+            break
     engine.stop()
