@@ -8,6 +8,7 @@ from scipy import spatial
 import threading
 import queue
 import pyttsx3
+from moviepy.editor import VideoFileClip
 
 
 mp_drawing = mp.solutions.drawing_utils
@@ -15,6 +16,7 @@ mp_pose = mp.solutions.pose
 capqueue = queue.Queue()
 tqueue = queue.Queue()
 p_score = 0
+path = ""
 
 class videocompare:
     def __init__(self, targetpath):
@@ -33,6 +35,8 @@ class videocompare:
         compare_thread = threading.Thread(target=video_compare_pose, args=(capqueue, tqueue))
         compare_thread.start()
         voice_thread = threading.Thread(target=voice_alert)
+        global path
+        path = targetpath
         voice_thread.start()
 
         camera_thread.join()
@@ -878,27 +882,40 @@ def video_compare_pose(capqueue, tqueue):
 
 
         if cv2.waitKey(10) & 0xFF == ord('q'):
+            
             break
 
 
+
 def voice_alert():
+    global path
+    # read video time
+    clip = VideoFileClip(path)
     engine = pyttsx3.init()
     time.sleep(2)
+    num = 2
     engine.say("3,   2,    1,   健身开始！")
     while True:
+        # if video end, alert will end at the same time
+        time.sleep(1)
+        num += 1
+        if num >= clip.duration:
+            break
+        # alert
         if p_score < 0.5:
             engine.say("加油，请继续保持喔")
             engine.runAndWait()
             time.sleep(8)
+            num += 8
         if p_score >= 0.6 and p_score <= 0.7:
             engine.say("危险，请注意调整动作")
             engine.runAndWait()
             time.sleep(3)
+            num += 3
         if p_score > 0.7:
             engine.say("注意安全，容易受伤！")
             engine.runAndWait()
+            num += 1.5
         if p_score <= 0.2:
-            break
-        if cv2.waitKey(10) & 0xFF == ord('q'):
             break
     engine.stop()
