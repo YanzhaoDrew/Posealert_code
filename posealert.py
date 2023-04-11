@@ -9,6 +9,8 @@ import threading
 import queue
 import pyttsx3
 from moviepy.editor import VideoFileClip
+from PIL import Image, ImageDraw, ImageFont
+import numpy
 
 
 mp_drawing = mp.solutions.drawing_utils
@@ -17,6 +19,7 @@ capqueue = queue.Queue()
 tqueue = queue.Queue()
 p_score = 0
 path = ""
+isEnd = False  # 按一次q，则触发窗口全退出
 
 class videocompare:
     def __init__(self, targetpath):
@@ -61,7 +64,7 @@ class posecompare:
         image_target = x[3]
 
         # target window screen height and width
-        dim = (960, 760)
+        dim = (814, 610)
         resized = cv2.resize(image_target, dim, interpolation=cv2.INTER_AREA)
         cv2.imshow('target', resized)
 
@@ -183,7 +186,7 @@ class posecompare:
                     angle8 = calculateAngle(left_hip, left_knee, left_ankle)
                     angle.append(int(angle8))
 
-                    compare_pose(image, angle_point, angle, angle_target)
+                    image = compare_pose(image, angle_point, angle, angle_target)
 
                     a_score = diff_compare_angle(angle, angle_target)
 
@@ -444,129 +447,150 @@ def compare_pose(image, angle_point, angle_user, angle_target):
 
     # Noted that cv2.putText can only display English characters and not Chinese characters
     # We should convert it into chinese encoder
-    cv2.putText(image, str("Score"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
+    image = cv2ImgAddText(image, "得分", 20, 10, (0, 153, 0), 30)
+    # cv2.putText(image, str("Score"), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2, cv2.LINE_AA)
     height, width, _ = image.shape
 
     if angle_user[0] < (angle_target[0] - 15):
         # print("Extend the right arm at elbow")
         stage = stage + 1
-        cv2.putText(image, str("Extend the right arm at elbow"), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "在肘部伸展右臂", 10, 40, (0, 153, 0), 35)
+        # cv2.putText(image, str("Extend the right arm at elbow"), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[0][0] * width), int(angle_point[0][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[0] > (angle_target[0] + 15):
         # print("Fold the right arm at elbow")
         stage = stage + 1
-        cv2.putText(image, str("Fold the right arm at elbow"), (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "将右臂折叠在肘部", 10, 40, (0, 153, 0), 35)
+        # cv2.putText(image, str("Fold the right arm at elbow"), (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[0][0] * width), int(angle_point[0][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[1] < (angle_target[1] - 15):
         # print("Extend the left arm at elbow")
         stage = stage + 1
-        cv2.putText(image, str("Extend the left arm at elbow"), (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "在肘部伸展左臂", 10, 75, (0, 153, 0), 35)
+        # cv2.putText(image, str("Extend the left arm at elbow"), (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[1][0] * width), int(angle_point[1][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[1] > (angle_target[1] + 15):
         # print("Fold the left arm at elbow")
         stage = stage + 1
-        cv2.putText(image, str("Fold the left arm at elbow"), (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "将左臂折叠在肘部", 10, 75, (0, 153, 0), 35)
+        # cv2.putText(image, str("Fold the left arm at elbow"), (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[1][0] * width), int(angle_point[1][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[2] < (angle_target[2] - 15):
         # print("Lift your right arm")
         stage = stage + 1
-        cv2.putText(image, str("Lift your right arm"), (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
-                    cv2.LINE_AA)
+        image = cv2ImgAddText(image, "抬起右臂", 10, 110, (0, 153, 0), 35)
+        # cv2.putText(image, str("Lift your right arm"), (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
+                    # cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[2][0] * width), int(angle_point[2][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[2] > (angle_target[2] + 15):
         # print("Put your arm down a little")
         stage = stage + 1
-        cv2.putText(image, str("Put your arm down a little"), (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "把你的右胳膊放下一点", 10, 110, (0, 153, 0), 35)
+        # cv2.putText(image, str("Put your arm down a little"), (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[2][0] * width), int(angle_point[2][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[3] < (angle_target[3] - 15):
         # print("Lift your left arm")
         stage = stage + 1
-        cv2.putText(image, str("Lift your left arm"), (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
-                    cv2.LINE_AA)
+        image = cv2ImgAddText(image, "抬起左臂", 10, 145, (0, 153, 0), 35)
+        # cv2.putText(image, str("Lift your left arm"), (10, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, [0, 153, 0], 2,
+                    # cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[3][0] * width), int(angle_point[3][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[3] > (angle_target[3] + 15):
         # print("Put your arm down a little")
         stage = stage + 1
-        cv2.putText(image, str("Put your arm down a little"), (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "把你的左胳膊放下一点", 10, 145, (0, 153, 0), 35)
+        # cv2.putText(image, str("Put your arm down a little"), (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[3][0] * width), int(angle_point[3][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[4] < (angle_target[4] - 15):
         # print("Extend the angle at right hip")
         stage = stage + 1
-        cv2.putText(image, str("Extend the angle at right hip"), (10, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "伸展右臀部的角度", 10, 180, (0, 153, 0), 35)
+        # cv2.putText(image, str("Extend the angle at right hip"), (10, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[4][0] * width), int(angle_point[4][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[4] > (angle_target[4] + 15):
         # print("Reduce the angle at right hip")
         stage = stage + 1
-        cv2.putText(image, str("Reduce the angle of at right hip"), (10, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "减小右臀部的角度", 10, 180, (0, 153, 0), 35)
+        # cv2.putText(image, str("Reduce the angle of at right hip"), (10, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[4][0] * width), int(angle_point[4][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[5] < (angle_target[5] - 15):
         # print("Extend the angle at left hip")
         stage = stage + 1
-        cv2.putText(image, str("Extend the angle at left hip"), (10, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "伸展左臀部的角度", 10, 215, (0, 153, 0), 35)
+        # cv2.putText(image, str("Extend the angle at left hip"), (10, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[5][0] * width), int(angle_point[5][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[5] > (angle_target[5] + 15):
         # print("Reduce the angle at left hip")
         stage = stage + 1
-        cv2.putText(image, str("Reduce the angle at left hip"), (10, 280), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "缩小左臀部角度", 10, 215, (0, 153, 0), 35)
+        # cv2.putText(image, str("Reduce the angle at left hip"), (10, 280), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[5][0] * width), int(angle_point[5][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[6] < (angle_target[6] - 15):
         # print("Extend the angle of right knee")
         stage = stage + 1
-        cv2.putText(image, str("Extend the angle of right knee"), (10, 300), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "伸展右膝角度", 10, 250, (0, 153, 0), 35)
+        # cv2.putText(image, str("Extend the angle of right knee"), (10, 300), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[6][0] * width), int(angle_point[6][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[6] > (angle_target[6] + 15):
         # print("Reduce the angle of right knee")
         stage = stage + 1
-        cv2.putText(image, str("Reduce the angle at right knee"), (10, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "缩小右膝角度", 10, 250, (0, 153, 0), 35)
+        # cv2.putText(image, str("Reduce the angle at right knee"), (10, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[6][0] * width), int(angle_point[6][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[7] < (angle_target[7] - 15):
         # print("Extend the angle at left knee")
         stage = stage + 1
-        cv2.putText(image, str("Extend the angle at left knee"), (10, 340), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "伸展左膝角度", 10, 285, (0, 153, 0), 35)
+        # cv2.putText(image, str("Extend the angle at left knee"), (10, 340), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[7][0] * width), int(angle_point[7][1] * height)), 30, (0, 0, 255), 5)
 
     if angle_user[7] > (angle_target[7] + 15):
         # print("Reduce the angle at left knee")
         stage = stage + 1
-        cv2.putText(image, str("Reduce the angle at left knee"), (10, 360), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                    [0, 153, 0], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "缩小左膝角度", 10, 285, (0, 153, 0), 35)
+        # cv2.putText(image, str("Reduce the angle at left knee"), (10, 360), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                    # [0, 153, 0], 2, cv2.LINE_AA)
         cv2.circle(image, (int(angle_point[7][0] * width), int(angle_point[7][1] * height)), 30, (0, 0, 255), 5)
     if stage < 2:
-        cv2.putText(image, str("Great!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
-                    cv2.LINE_AA)
+        image = cv2ImgAddText(image, "很棒喔！", 170, 5, (0, 0, 225), 35)
+        # cv2.putText(image, str("Great!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+                    # cv2.LINE_AA)
     elif 2 < stage < 5:
-        cv2.putText(image, str("Fighting!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2, cv2.LINE_AA)
+        image = cv2ImgAddText(image, "继续加油！", 170, 5, (0, 0, 225), 35)
+        # cv2.putText(image, str("Fighting!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2, cv2.LINE_AA)
 
     elif stage > 5:
-        cv2.putText(image, str("Dangerous!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
-                    cv2.LINE_AA)
+        image = cv2ImgAddText(image, "危险危险！", 170, 5, (225, 0, 0), 35)
+        # cv2.putText(image, str("Dangerous!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+                    # cv2.LINE_AA)
+    return image
 
 
 def Average(lst):
@@ -600,7 +624,7 @@ def detect_pose(cap, queue):
     # start the real-time pose detection and compare to the target
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         ptime = 0
-        while cap.isOpened():
+        while cap.isOpened() and not isEnd:
             success, frame = cap.read()
             frame = cv2.flip(frame, 1)
 
@@ -624,6 +648,7 @@ def detect_pose(cap, queue):
             # shape is a tuple of three values (height, width, channels) ,_ is hold for the channel,
             image_height, image_width, _ = image.shape
             image = cv2.resize(image, (int(image_width * (860 / image_height)), 860))
+            image = cv2.resize(image, (814, 610))
 
             try:
 
@@ -710,6 +735,9 @@ def detect_pose(cap, queue):
             cv2.putText(image, str(fps_text), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, [254, 118, 136], 2,
                         cv2.LINE_AA)
 
+            cv2.namedWindow('AI Exercise', 0)
+            cv2.resizeWindow('AI Exercise', 814, 644)
+            cv2.moveWindow('AI Exercise', 1084, 197)
             cv2.imshow('AI Exercise', image)
 
             if cv2.waitKey(10) & 0xFF == ord('q'):
@@ -723,7 +751,7 @@ def detect_pose(cap, queue):
 def detect_video(cap, queue):
     # start the real-time pose detection and compare to the target
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
-        while cap.isOpened():
+        while cap.isOpened() and not isEnd:
             success, frame = cap.read()
            # frame = cv2.flip(frame, 1)
 
@@ -743,7 +771,7 @@ def detect_video(cap, queue):
             cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
             # target window screen height and width
-            dim = (960, 760)
+            dim = (814, 644)
             image = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
 
             try:
@@ -823,7 +851,10 @@ def detect_video(cap, queue):
             except:
                 pass
 
-                # display the video frame
+            # display the video frame
+            cv2.namedWindow('target_video', 0)
+            cv2.resizeWindow('target_video', 814, 610)
+            cv2.moveWindow('target_video', 270, 197)
             cv2.imshow('target_video', image)
 
             if cv2.waitKey(10) & 0xFF == ord('q'):
@@ -835,7 +866,8 @@ def detect_video(cap, queue):
 
 
 def video_compare_pose(capqueue, tqueue):
-    while True:
+    global isEnd
+    while not isEnd:
         cap = capqueue.get()
         target = tqueue.get()
 
@@ -855,14 +887,17 @@ def video_compare_pose(capqueue, tqueue):
         p_score = dif_compare(cap, target)
 
         if p_score > 0.5:
-            cv2.putText(img, str("Catch up!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
-                        cv2.LINE_AA)
+            img = cv2ImgAddText(img, "小心！", 170, 5, (255, 0, 0), 35)
+            # cv2.putText(img, str("Catch up!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+                        # cv2.LINE_AA)
         elif 0.5 > p_score > 0.2:
-            cv2.putText(img, str("Good!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
-                        cv2.LINE_AA)
+            img = cv2ImgAddText(img, "很棒!", 170, 5, (255, 0, 0), 35)
+            # cv2.putText(img, str("Good!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+                        # cv2.LINE_AA)
         else:
-            cv2.putText(img, str("Excellent!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
-                        cv2.LINE_AA)
+            img = cv2ImgAddText(img, "完美！！！", 170, 5, (255, 0, 0), 35)
+            # cv2.putText(img, str("Excellent!"), (170, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 0, 255], 2,
+                        # cv2.LINE_AA)
 
         # define per and bar
         color = (254, 118, 136)
@@ -878,11 +913,14 @@ def video_compare_pose(capqueue, tqueue):
                     color, 3)
 
         # Display the image in a window
+        img = cv2.resize(img, (256, 257))
+        cv2.namedWindow('Score', 0)
+        cv2.resizeWindow('Score', 256, 257)
+        cv2.moveWindow('Score', 14, 291)
         cv2.imshow('Score', img)
 
-
         if cv2.waitKey(10) & 0xFF == ord('q'):
-            
+            isEnd = True
             break
 
 
@@ -895,11 +933,11 @@ def voice_alert():
     time.sleep(2)
     num = 2
     engine.say("3,   2,    1,   健身开始！")
-    while True:
-        # if video end, alert will end at the same time
+    while not isEnd:
+        # if video end, alert will end ahead of 3 second
         time.sleep(1)
         num += 1
-        if num >= clip.duration:
+        if num >= clip.duration - 3:
             break
         # alert
         if p_score < 0.5:
@@ -919,3 +957,18 @@ def voice_alert():
         if p_score <= 0.2:
             break
     engine.stop()
+
+def cv2ImgAddText(img, text, left, top, textColor=(0, 255, 0), textSize=20):
+    if (isinstance(img, numpy.ndarray)):  # 判断是否OpenCV图片类型
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    # 创建一个可以在给定图像上绘图的对象
+    draw = ImageDraw.Draw(img)
+    # 字体的格式
+    fontStyle = ImageFont.truetype(
+        "font/simsun.ttc", textSize, encoding="utf-8")
+    # 绘制文本
+    draw.text((left, top), text, textColor, font=fontStyle)
+    # 转换回OpenCV格式
+    return cv2.cvtColor(numpy.asarray(img), cv2.COLOR_RGB2BGR)
+
+
