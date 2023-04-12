@@ -735,7 +735,9 @@ def detect_pose(cap, queue):
             cv2.putText(image, str(fps_text), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, [254, 118, 136], 2,
                         cv2.LINE_AA)
 
-            cv2.namedWindow('AI Exercise', 0)
+            cv2.namedWindow('AI Exercise', cv2.WND_PROP_FULLSCREEN)
+            cv2.setWindowProperty('AI Exercise', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            # cv2.namedWindow('AI Exercise', 0)
             cv2.resizeWindow('AI Exercise', 814, 644)
             cv2.moveWindow('AI Exercise', 1084, 197)
             cv2.imshow('AI Exercise', image)
@@ -852,11 +854,17 @@ def detect_video(cap, queue):
                 pass
 
             # display the video frame
-            cv2.namedWindow('target_video', 0)
+            cv2.namedWindow('target_video', cv2.WND_PROP_FULLSCREEN)
+            cv2.setWindowProperty('target_video', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            # cv2.namedWindow('target_video', 0)
             cv2.resizeWindow('target_video', 814, 610)
             cv2.moveWindow('target_video', 270, 197)
             cv2.imshow('target_video', image)
 
+            # show = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            # showImage = QImage(show.data, show.shape[1], show.shape[0], QImage.Format_RGB888)
+
+            # self.cameraLabel.setPixmap(QPixmap.fromImage(showImage))
             if cv2.waitKey(10) & 0xFF == ord('q'):
                 queue.put(None)
                 cap.release()
@@ -913,8 +921,10 @@ def video_compare_pose(capqueue, tqueue):
                     color, 3)
 
         # Display the image in a window
-        img = cv2.resize(img, (256, 257))
-        cv2.namedWindow('Score', 0)
+        img = cv2.resize(img, (513, 512))
+        cv2.namedWindow('Score', cv2.WND_PROP_FULLSCREEN)
+        cv2.setWindowProperty('Score', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        # cv2.namedWindow('Score', 0)
         cv2.resizeWindow('Score', 256, 257)
         cv2.moveWindow('Score', 14, 291)
         cv2.imshow('Score', img)

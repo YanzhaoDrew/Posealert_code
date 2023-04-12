@@ -11,8 +11,15 @@ from posealert import posecompare, videocompare
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 
+# 存储12个视频路径列表
+inputpath_list = ["pic/test.jpg", "pic/zumba.mp4", "pic/walking.mp4"]
+choice = 0
+
+
 class Ui_DialogB1(object):
-    def setupUi(self, Dialog):
+    def setupUi(self, Dialog, choice_End):
+        global choice
+        choice = choice_End
         Dialog.setObjectName("Dialog")
         Dialog.resize(1920, 1080)
         self.gridLayout = QtWidgets.QGridLayout(Dialog)
@@ -55,15 +62,13 @@ class Ui_DialogB1(object):
         self.pushButton_7.setText(_translate("Dialog", "Start"))
         self.pushButton_8.setText(_translate("Dialog", "nothing"))
         self.pushButton_9.setText(_translate("Dialog", "nothing"))
-        self.pushButton_7.clicked.connect(self.posewin)
-        self.pushButton_8.clicked.connect(self.fitwin)
+        self.pushButton_7.clicked.connect(self.start_train)
 
-    def posewin(self):
-        inputpath = "pic/test.jpg"
-        posecompare(inputpath)
-        self.close()
-
-    def fitwin(self):
-        inputpath = "pic/zumba.mp4"
-        videocompare(inputpath)
+    def start_train(self):
+        # 进行后缀判断,判断是静态图跟练，还是视频跟练
+        bool_video = inputpath_list[choice].endswith(".mp4")
+        if bool_video:
+            videocompare(inputpath_list[choice])
+        else:
+            posecompare(inputpath_list[choice])
         self.close()
