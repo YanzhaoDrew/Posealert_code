@@ -22,6 +22,7 @@ class Ui_DialogB1(object):
         choice = choice_End
         Dialog.setObjectName("Dialog")
         Dialog.resize(1920, 1080)
+        Dialog.move(0, 0)
         self.gridLayout = QtWidgets.QGridLayout(Dialog)
         self.gridLayout.setObjectName("gridLayout")
         self.tableWidget = QtWidgets.QTableWidget(Dialog)
