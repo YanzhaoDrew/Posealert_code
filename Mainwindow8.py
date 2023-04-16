@@ -325,6 +325,7 @@ class Ui_MainWindow(object):
         global choice
         choice = choice_end
         self.demo = ChildWindowB1()
+        self.demo.showFullScreen()
         self.demo.show()
 
 class ChildWindowB1(QDialog, Ui_DialogB1):
